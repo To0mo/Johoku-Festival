@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>第85回 城北祭 - 翔 - 公式サイト</title>
+    <title>第85回 城北祭 - 翔 - 公式サイト (MQTT同期版)</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;500;700&family=Zen+Dots&family=Shippori+Mincho:wght@600&display=swap" rel="stylesheet">
+    <!-- MQTT.js ライブラリ -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     
     <style>
         /* --- CSS設定 (デザイン) --- */
@@ -100,10 +102,14 @@
         }
         .loc-btn:hover { background: var(--main-blue); border-color: var(--main-blue); }
 
-        /* フッター */
         footer { margin-top: 100px; padding: 50px 20px; background: #020305; text-align: center; color: #666; border-top: 1px solid #222; }
         .admin-link { cursor: pointer; font-size: 0.8rem; transition: 0.3s; }
         .admin-link:hover { color: var(--main-pink); }
+        
+        /* 通信中バッジ */
+        #sync-status {
+            position: fixed; bottom: 10px; right: 10px; font-size: 0.7rem; color: #555; z-index: 2000;
+        }
 
         /* モーダル共通 */
         .modal-overlay {
@@ -118,7 +124,6 @@
         }
         .close-modal { position: absolute; top: 15px; right: 20px; font-size: 2rem; cursor: pointer; color: #888; }
         
-        /* 管理画面スタイル */
         .admin-input { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: #fff; margin-bottom: 10px; box-sizing: border-box; }
         .admin-label { color: var(--main-cyan); font-size: 0.9rem; margin-top: 15px; display: block; margin-bottom: 5px; }
         .btn-action { width: 100%; padding: 12px; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; color: #fff; transition: 0.3s; }
@@ -126,25 +131,22 @@
         .btn-danger { background: var(--main-pink); }
         .btn-save { background: var(--main-blue); }
         
-        /* 管理画面リスト */
         .admin-list-item {
             display: flex; justify-content: space-between; align-items: center;
             padding: 10px; border-bottom: 1px solid #333; font-size: 0.9rem;
         }
-        .admin-list-item:hover { background: rgba(255,255,255,0.05); }
         .item-info { flex: 1; text-align: left; }
         .item-actions { display: flex; gap: 5px; }
         .btn-sm { padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; color: #fff; }
         .btn-edit { background: var(--main-blue); }
         .btn-del { background: var(--main-pink); }
-
-        /* 編集フォーム用モーダル */
         #editFormModal { z-index: 1100; }
     </style>
 </head>
 <body>
 
     <canvas id="bg-canvas"></canvas>
+    <div id="sync-status">MQTT: Disconnected</div>
 
     <header>
         <div class="logo">城北祭 -翔-</div>
@@ -196,7 +198,8 @@
         <p class="admin-link" onclick="openAdmin()">[ 製作者(管理者)ページへ ]</p>
     </footer>
 
-    <div id="mapModal" class="modal-overlay" onclick="if(event.target==this)document.getElementById('mapModal').style.display='none'">
+    <!-- 各種モーダル -->
+    <div id="mapModal" class="modal-overlay" onclick="if(event.target==this)this.style.display='none'">
         <div class="modal-content">
             <span class="close-modal" onclick="document.getElementById('mapModal').style.display='none'">&times;</span>
             <h3 id="mapTitle" style="color:var(--main-cyan); border-bottom:1px solid #333; padding-bottom:10px;"></h3>
@@ -211,26 +214,24 @@
             <h3 style="color: var(--main-cyan); margin-top:0;">システム管理パネル</h3>
             
             <div id="adminLogin">
-                <input type="password" id="passInput" class="admin-input" placeholder="パスワードを入力 (初期: admin)">
+                <input type="password" id="passInput" class="admin-input" placeholder="パスワードを入力">
                 <button onclick="login()" class="btn-action btn-login">認証</button>
                 <p id="loginMsg" style="color: var(--main-pink); margin-top: 10px;"></p>
             </div>
 
             <div id="adminPanel" style="display: none;">
-                
                 <div style="border: 1px solid #333; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
-                    <h4 style="margin:0 0 10px 0; color:#ccc;">📅 開催日時設定 (カウントダウン)</h4>
+                    <h4 style="margin:0 0 10px 0; color:#ccc;">📅 開催日時設定 (クラウド同期)</h4>
                     <input type="datetime-local" id="dateInput" class="admin-input" style="color-scheme: dark;">
-                    <button onclick="saveDate()" class="btn-action btn-save" style="margin-top:5px;">日時を更新</button>
+                    <button onclick="saveDate()" class="btn-action btn-save" style="margin-top:5px;">日時を全体に反映</button>
                 </div>
 
                 <div style="border: 1px solid #333; padding: 15px; border-radius: 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                         <h4 style="margin:0; color:#ccc;">🛠 企画データ編集・削除</h4>
-                        <button onclick="resetData()" class="btn-sm btn-del">全リセット</button>
+                        <button onclick="resetData()" class="btn-sm btn-del">全初期化</button>
                     </div>
-                    <div id="adminListContainer" style="max-height: 400px; overflow-y: scroll; border: 1px solid #222;">
-                        </div>
+                    <div id="adminListContainer" style="max-height: 400px; overflow-y: scroll; border: 1px solid #222;"></div>
                 </div>
 
                 <div style="margin-top:20px; text-align:right;">
@@ -244,42 +245,47 @@
         <div class="modal-content" style="max-width: 500px;">
             <h3 style="color:var(--main-blue);">企画情報の編集</h3>
             <input type="hidden" id="editId">
-            
-            <label class="admin-label">団体名 (クラス名)</label>
-            <input type="text" id="editGroup" class="admin-input">
-            
-            <label class="admin-label">企画タイトル</label>
-            <input type="text" id="editTitle" class="admin-input">
-            
-            <label class="admin-label">説明文</label>
-            <textarea id="editDesc" class="admin-input" rows="3"></textarea>
-            
-            <label class="admin-label">場所</label>
-            <input type="text" id="editLoc" class="admin-input">
-            
+            <label class="admin-label">団体名 (クラス名)</label><input type="text" id="editGroup" class="admin-input">
+            <label class="admin-label">企画タイトル</label><input type="text" id="editTitle" class="admin-input">
+            <label class="admin-label">説明文</label><textarea id="editDesc" class="admin-input" rows="3"></textarea>
+            <label class="admin-label">場所</label><input type="text" id="editLoc" class="admin-input">
             <label class="admin-label">カテゴリー</label>
             <select id="editType" class="admin-input">
                 <option value="exp">アトラクション</option>
                 <option value="exh">展示・公演</option>
                 <option value="food">食品・模擬店</option>
             </select>
-
             <div style="display:flex; gap:10px; margin-top:20px;">
                 <button onclick="document.getElementById('editFormModal').style.display='none'" class="btn-action" style="background:#444;">キャンセル</button>
-                <button onclick="saveEdit()" class="btn-action btn-save">保存する</button>
+                <button onclick="saveEdit()" class="btn-action btn-save">全体へ保存</button>
             </div>
         </div>
     </div>
 
     <script>
-        // === 設定定数 ===
+        // === 1. MQTT 設定 ===
+        // ※このTOPICを、他とかぶらない自分たちだけの合言葉に変更してください。
+        const MQTT_TOPIC = "johoku85_shou_official_data_777"; 
+        const MQTT_BROKER = "wss://public:public@public.cloud.shiftr.io";
+        
+        const client = mqtt.connect(MQTT_BROKER, { clientId: 'johoku_' + Math.random().toString(16).substr(2, 8) });
+        const syncStatus = document.getElementById('sync-status');
+
+        client.on('connect', () => {
+            syncStatus.innerText = "MQTT: Connected (Ready)";
+            syncStatus.style.color = "#00f0ff";
+            client.subscribe(MQTT_TOPIC);
+        });
+
+        client.on('error', (err) => { syncStatus.innerText = "MQTT: Error"; console.error(err); });
+
+        // === 2. データ初期化と同期処理 ===
         const DB_KEY = 'johoku_data_v2';
         const PASS_KEY = 'johoku_pass_v2';
         const DATE_KEY = 'johoku_date_v2';
         const DEFAULT_PASS = 'admin';
         const DEFAULT_DATE = '2026-09-16T09:00';
 
-        // === 1. データ初期化 ===
         function generateData() {
             const data = [];
             const createClass = (school, grade, className) => {
@@ -288,9 +294,8 @@
                 const themes = ["脱出ゲーム", "お化け屋敷", "カジノ", "ジェットコースター", "VR体験", "縁日", "カフェ", "演劇", "映画"];
                 let title = themes[Math.floor(Math.random()*themes.length)];
                 if(type === 'food') title = ["焼きそば", "タピオカ", "チュロス", "パンケーキ"][Math.floor(Math.random()*4)];
-
                 return {
-                    id: `${school}${grade}-${className}`,
+                    id: `${school}${grade}-${className}-${Math.random()}`,
                     group: `${school}${grade}-${className}`,
                     title: title,
                     desc: `みんなで作り上げた最高の企画です！ぜひ来てください。`,
@@ -298,20 +303,46 @@
                     location: `${school}校舎教室`
                 };
             };
-            // 中1-3 (A-G)
             for(let g=1; g<=3; g++) for(let c=0; c<7; c++) data.push(createClass('中', g, String.fromCharCode(65+c)));
-            // 高1-3 (A-I)
             for(let g=1; g<=3; g++) for(let c=0; c<9; c++) data.push(createClass('高', g, String.fromCharCode(65+c)));
             return data;
         }
 
-        let eventData = JSON.parse(localStorage.getItem(DB_KEY));
-        if (!eventData || eventData.length < 10) { 
-            eventData = generateData();
-            localStorage.setItem(DB_KEY, JSON.stringify(eventData));
+        // 起動時はローカルを見るが、すぐにMQTTから最新版が降ってくる
+        let eventData = JSON.parse(localStorage.getItem(DB_KEY)) || generateData();
+
+        // ブローカーからメッセージ受信（Retained Messageもここに入る）
+        client.on('message', (topic, message) => {
+            if (topic === MQTT_TOPIC) {
+                try {
+                    const remoteData = JSON.parse(message.toString());
+                    console.log("MQTTデータを受信しました");
+                    
+                    // リモートデータでローカルを上書き
+                    eventData = remoteData.eventData;
+                    localStorage.setItem(DB_KEY, JSON.stringify(eventData));
+                    localStorage.setItem(DATE_KEY, remoteData.targetDate);
+                    
+                    // UI更新
+                    renderCards();
+                    updateTimer();
+                    if(document.getElementById('adminPanel').style.display === 'block') renderAdminList();
+                } catch (e) { console.error("データ解析エラー", e); }
+            }
+        });
+
+        // クラウド（ブローカー）に全データを同期する
+        function publishToCloud() {
+            const payload = {
+                eventData: eventData,
+                targetDate: localStorage.getItem(DATE_KEY) || DEFAULT_DATE
+            };
+            // qos: 1 (確実に届ける), retain: true (後から来た人にも渡す)
+            client.publish(MQTT_TOPIC, JSON.stringify(payload), { qos: 1, retain: true });
+            console.log("MQTTへ同期完了");
         }
 
-        // === 2. 表示機能 ===
+        // === 3. 表示機能 ===
         const grid = document.getElementById('cardGrid');
         let currentFilter = 'all';
 
@@ -330,7 +361,7 @@
                 const colors = { exp: '#bc13fe', exh: '#00f0ff', food: '#ffcc00' };
                 const labels = { exp: 'ATTRACTION', exh: 'EXHIBIT', food: 'FOOD' };
                 const html = `
-                    <div class="card" style="animation:fadeIn 0.5s ease ${idx*0.02}s forwards; opacity:0; transform:translateY(10px);">
+                    <div class="card" style="animation:fadeIn 0.5s ease ${idx*0.01}s forwards; opacity:0; transform:translateY(10px);">
                         <div style="display:flex; justify-content:space-between;">
                             <span class="group-tag" style="border-color:${colors[item.type]}; color:${colors[item.type]};">${item.group}</span>
                             <span style="font-size:0.7rem; color:#888;">${labels[item.type]}</span>
@@ -342,6 +373,7 @@
                 grid.insertAdjacentHTML('beforeend', html);
             });
         }
+
         function filterData(type, btn) {
             currentFilter = type;
             document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
@@ -357,12 +389,11 @@
             document.getElementById('mapModal').style.display = 'flex';
         }
 
-        // === 3. 管理者機能 (編集・削除・日時) ===
+        // === 4. 管理者機能 (MQTT同期版) ===
         function openAdmin() {
             document.getElementById('adminModal').style.display = 'flex';
             document.getElementById('adminLogin').style.display = 'block';
             document.getElementById('adminPanel').style.display = 'none';
-            document.getElementById('passInput').value = '';
         }
         function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
 
@@ -370,26 +401,21 @@
             if(document.getElementById('passInput').value === (localStorage.getItem(PASS_KEY) || DEFAULT_PASS)) {
                 document.getElementById('adminLogin').style.display = 'none';
                 document.getElementById('adminPanel').style.display = 'block';
-                loadDateSetting();
+                document.getElementById('dateInput').value = localStorage.getItem(DATE_KEY) || DEFAULT_DATE;
                 renderAdminList();
             } else {
                 document.getElementById('loginMsg').innerText = 'パスワードが違います';
             }
         }
 
-        // 日時設定
-        function loadDateSetting() {
-            document.getElementById('dateInput').value = localStorage.getItem(DATE_KEY) || DEFAULT_DATE;
-        }
         function saveDate() {
             const val = document.getElementById('dateInput').value;
             if(!val) return;
             localStorage.setItem(DATE_KEY, val);
-            alert('開催日時を更新しました');
-            updateTimer(); // タイマー即時反映
+            publishToCloud(); // 全体に反映
+            alert('開催日時を全体に同期しました');
         }
 
-        // 管理リスト描画
         function renderAdminList() {
             const container = document.getElementById('adminListContainer');
             container.innerHTML = '';
@@ -410,17 +436,16 @@
             });
         }
 
-        // 削除機能
         function deleteItem(id) {
-            if(confirm('本当にこのデータを削除しますか？')) {
+            if(confirm('本当に削除しますか？他の人の画面からも消えます。')) {
                 eventData = eventData.filter(e => e.id !== id);
                 localStorage.setItem(DB_KEY, JSON.stringify(eventData));
-                renderAdminList(); // リスト更新
-                renderCards();     // 裏側のメイン画面も更新
+                publishToCloud();
+                renderAdminList();
+                renderCards();
             }
         }
 
-        // 編集機能
         function openEdit(id) {
             const item = eventData.find(e => e.id === id);
             if(!item) return;
@@ -444,16 +469,20 @@
                 eventData[idx].type = document.getElementById('editType').value;
                 
                 localStorage.setItem(DB_KEY, JSON.stringify(eventData));
+                publishToCloud(); // MQTT送信
+                
                 document.getElementById('editFormModal').style.display = 'none';
                 renderAdminList();
                 renderCards();
-                alert('保存しました');
+                alert('全体に保存・同期しました');
             }
         }
 
         function resetData() {
-            if(confirm('警告: 全データを初期化し、クラス生成をやり直します。よろしいですか？')) {
-                localStorage.removeItem(DB_KEY);
+            if(confirm('警告: 全てのデータを初期化します。よろしいですか？')) {
+                eventData = generateData();
+                localStorage.setItem(DB_KEY, JSON.stringify(eventData));
+                publishToCloud();
                 location.reload();
             }
         }
@@ -463,11 +492,14 @@
             if(p) { localStorage.setItem(PASS_KEY, p); alert("変更しました"); }
         }
 
-        // === 4. タイマー & 背景 ===
+        // === 5. タイマー & 背景 ===
         function updateTimer() {
             const targetDate = localStorage.getItem(DATE_KEY) || DEFAULT_DATE;
             const diff = new Date(targetDate).getTime() - new Date().getTime();
-            if (diff < 0) return;
+            if (diff < 0) {
+                document.querySelectorAll('.time-num').forEach(e => e.innerText = '00');
+                return;
+            }
             document.getElementById('d').innerText = Math.floor(diff / (86400000)).toString().padStart(2,'0');
             document.getElementById('h').innerText = Math.floor((diff % 86400000) / 3600000).toString().padStart(2,'0');
             document.getElementById('m').innerText = Math.floor((diff % 3600000) / 60000).toString().padStart(2,'0');
