@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第85回 城北祭 - 男前 -</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&family=Shippori+Mincho:wght@900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-    <!-- MQTT.js ライブラリを追加 -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     
     <style>
@@ -74,10 +73,14 @@
         .card.voted { border-color: var(--main-red); background: rgba(230, 0, 18, 0.15); }
         .card-class { color: var(--main-red); font-weight: 900; font-size: 0.8rem; margin-bottom: 5px; }
         .card-desc { font-size: 0.85rem; color: #ccc; margin: 10px 0; line-height: 1.6; }
-        .btn-vote { width: 100%; padding: 10px; margin-top: 5px; font-weight: 900; border: none; cursor: pointer; }
+        
+        .btn-vote { width: 100%; padding: 10px; margin-top: 15px; font-weight: 900; border: none; cursor: pointer; transition: 0.2s; }
         .btn-vote.active { background: var(--main-red); color: #fff; }
+        .btn-vote.active:hover { background: #ff1a2e; }
+        .btn-vote.active:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        
         .btn-vote.cancel { background: #444; color: #fff; }
-        .vote-count { font-size: 0.8rem; color: #888; text-align: right; margin-top: 5px; }
+        .btn-vote.cancel:hover { background: #666; }
 
         /* タイムテーブル */
         .tt-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -100,16 +103,18 @@
         input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; background: #000; color: #fff; border: 1px solid #333; box-sizing: border-box; }
         .admin-section { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #222; }
 
+        /* 通信中ロック */
+        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; cursor: wait; background: rgba(0,0,0,0); }
+
         footer { background: #000; padding: 60px; text-align: center; font-size: 0.7rem; opacity: 0.5; }
-        /* 同期ステータス（ひっそりと表示） */
-        #sync-status { position:fixed; bottom:5px; right:5px; color:#333; font-size:0.6rem; z-index:10; }
     </style>
 </head>
 <body>
 
     <div id="opening"><div class="op-text">男 前</div></div>
     <div class="bg-pattern"></div>
-    <div id="sync-status">Connecting...</div>
+    <!-- 通信中の操作ブロック用レイヤー -->
+    <div id="loading-overlay"></div>
 
     <header>
         <div class="logo">第85回 城北祭</div>
@@ -204,12 +209,15 @@
 
     <script>
         // --- 1. MQTT接続設定 ---
-        // ※注意: MQTT_TOPIC は誰かとかぶるとバグるので、必ず自分たちだけの合言葉に変えてください！
-        const MQTT_TOPIC = "johoku85_otokomae_sys_v1_SECRET"; 
+        const MQTT_TOPIC = "johoku85_otokomae_sys_v2_SECRET"; // 必要に応じて変更してください
         const MQTT_BROKER = "wss://public:public@public.cloud.shiftr.io";
-
-        const client = mqtt.connect(MQTT_BROKER, { clientId: 'johoku_user_' + Math.random().toString(16).substr(2, 8) });
-        const syncStatus = document.getElementById('sync-status');
+        
+        // 自分を識別するID（ループ防止用）
+        const MY_CLIENT_ID = 'user_' + Math.random().toString(36).substring(2, 10);
+        const client = mqtt.connect(MQTT_BROKER, { clientId: MY_CLIENT_ID });
+        
+        // 連打防止用ロック
+        let isProcessing = false;
 
         // --- 2. データ初期設定 ---
         const initialProjects = [];
@@ -231,19 +239,17 @@
             return arr;
         };
 
-        // データ変数 (同期対象)
         let projects = JSON.parse(localStorage.getItem('j85_projects')) || generateInitialData();
         let allVotes = JSON.parse(localStorage.getItem('j85_votes_all')) || {};
         let ttData = JSON.parse(localStorage.getItem('j85_tt')) || {
             kodo: "09:30,オープニング\n13:00,ミスター城北\n15:00,吹奏楽部演奏",
             ground: "10:00,招待試合\n12:00,部活対抗リレー\n15:30,後夜祭予行"
         };
-        // 個人データ (同期しない)
         let myVoteId = localStorage.getItem('j85_my_vote') || null;
 
         // --- 3. MQTTイベント処理 ---
         client.on('connect', () => {
-            syncStatus.innerText = "ONLINE"; syncStatus.style.color = "#0f0";
+            console.log("Connected");
             client.subscribe(MQTT_TOPIC);
         });
 
@@ -251,30 +257,40 @@
             if (topic === MQTT_TOPIC) {
                 try {
                     const remoteData = JSON.parse(message.toString());
-                    console.log("同期データ受信:", remoteData);
                     
-                    // データを上書き
+                    // 自分が送信したデータが返ってきた場合は無視（ループ防止）
+                    if (remoteData.sender === MY_CLIENT_ID) return;
+
+                    // データを更新
                     if(remoteData.projects) projects = remoteData.projects;
                     if(remoteData.votes) allVotes = remoteData.votes;
                     if(remoteData.tt) ttData = remoteData.tt;
                     
-                    // 保存＆再描画
                     saveToLocal();
                     renderVoteGrid();
                     renderTT();
                     if(document.getElementById('adminModal').style.display === 'block') refreshAdminView();
-                } catch(e) { console.error("データ解析エラー", e); }
+                } catch(e) { console.error("Data Error", e); }
             }
         });
 
-        // データをクラウドへ送信 (retain: true で保存させる)
+        // データを送信（ロック機能付き）
         function syncToCloud() {
             const payload = {
+                sender: MY_CLIENT_ID, // 送信者IDを付与
                 projects: projects,
                 votes: allVotes,
                 tt: ttData
             };
+            // 重要な更新なので retain: true
             client.publish(MQTT_TOPIC, JSON.stringify(payload), { qos: 1, retain: true });
+            
+            // 操作ロック解除タイマー
+            setTimeout(() => {
+                isProcessing = false;
+                document.getElementById('loading-overlay').style.display = 'none';
+                renderVoteGrid(); // ボタン状態を戻すために再描画
+            }, 2000); // 2秒間は操作不能にする
         }
 
         function saveToLocal() {
@@ -301,17 +317,24 @@
             const grid = document.getElementById('cardGrid');
             grid.innerHTML = projects.map(p => {
                 const isMyVote = myVoteId === p.id;
-                const voteCount = allVotes[p.id] || 0;
+                // 一般ユーザーには票数を見せない
+                
+                // ボタンの文言
+                let btnHtml = '';
+                if (isProcessing) {
+                    btnHtml = `<button class="btn-vote active" disabled>処理中...</button>`;
+                } else if (isMyVote) {
+                    btnHtml = `<button class="btn-vote cancel" onclick="cancelVote()">投票を取り消す</button>`;
+                } else {
+                    btnHtml = `<button class="btn-vote active" onclick="castVote('${p.id}')" ${myVoteId ? 'disabled' : ''}>${myVoteId ? '他へ投票済み' : 'この企画に投票'}</button>`;
+                }
+
                 return `
                     <div class="card ${isMyVote ? 'voted' : ''}">
                         <div class="card-class">${p.class}</div>
                         <div style="font-weight:900; font-size:1.1rem;">${p.title}</div>
                         <div class="card-desc">${p.desc}</div>
-                        <div class="vote-count">現在: ${voteCount} 票</div>
-                        ${isMyVote 
-                            ? `<button class="btn-vote cancel" onclick="cancelVote()">投票を取り消す</button>`
-                            : `<button class="btn-vote active" onclick="castVote('${p.id}')" ${myVoteId ? 'disabled' : ''}>${myVoteId ? '-' : 'この企画に投票'}</button>`
-                        }
+                        ${btnHtml}
                     </div>
                 `;
             }).join('');
@@ -325,31 +348,38 @@
             document.getElementById('tt-ground').innerHTML = buildRows(ttData.ground);
         }
 
-        // --- 6. 投票処理 (同期対応) ---
+        // --- 6. 投票処理 (連打対策強化版) ---
         function castVote(id) {
+            if (isProcessing) return; // 処理中なら何もしない
+            isProcessing = true;
+            document.getElementById('loading-overlay').style.display = 'block'; // 全画面ガード
+            renderVoteGrid(); // ボタンを「処理中」に変える
+
             myVoteId = id;
-            // 自分の票を足す
             allVotes[id] = (allVotes[id] || 0) + 1;
             
             localStorage.setItem('j85_my_vote', myVoteId);
             saveToLocal();
-            renderVoteGrid();
-            syncToCloud(); // 全体へ送信
+            syncToCloud();
         }
 
         function cancelVote() {
-            if(!myVoteId) return;
-            // 自分の票を引く
-            allVotes[myVoteId] = Math.max(0, (allVotes[myVoteId] || 1) - 1);
+            if (isProcessing) return;
+            if (!myVoteId) return;
             
+            isProcessing = true;
+            document.getElementById('loading-overlay').style.display = 'block';
+            renderVoteGrid();
+
+            allVotes[myVoteId] = Math.max(0, (allVotes[myVoteId] || 1) - 1);
             myVoteId = null;
+            
             localStorage.setItem('j85_my_vote', "");
             saveToLocal();
-            renderVoteGrid();
-            syncToCloud(); // 全体へ送信
+            syncToCloud();
         }
 
-        // --- 7. 管理者機能 (同期対応) ---
+        // --- 7. 管理者機能 ---
         function openAdmin() {
             if (prompt("パスワードを入力してください") === "0000") {
                 document.getElementById('adminModal').style.display = 'block';
@@ -358,21 +388,22 @@
         }
         
         function refreshAdminView() {
-            // 投票結果更新
+            // ここでのみ票数を表示
             document.getElementById('adminVoteChart').innerHTML = Object.entries(allVotes)
                 .sort((a,b) => b[1] - a[1])
                 .map(([id, count]) => {
                     const p = projects.find(x => x.id === id);
-                    return `<div style="padding:5px; border-bottom:1px solid #333;">${count}票 : ${p ? p.class : id} ${p ? p.title : ''}</div>`;
+                    return `<div style="padding:5px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
+                        <span>${p ? p.class : id} ${p ? p.title : ''}</span>
+                        <strong style="color:var(--main-red);">${count}票</strong>
+                    </div>`;
                 }).join('');
                 
-            // プルダウン更新 (初回のみでよいが念のため)
             const sel = document.getElementById('editTarget');
             if(sel.options.length !== projects.length) {
                 sel.innerHTML = projects.map(p => `<option value="${p.id}">${p.class} ${p.title}</option>`).join('');
                 loadProjectToForm();
             }
-            // TT更新
             document.getElementById('editTTKodo').value = ttData.kodo;
             document.getElementById('editTTGround').value = ttData.ground;
         }
@@ -386,6 +417,9 @@
         }
 
         function updateProjectData() {
+            if(isProcessing) return;
+            isProcessing = true;
+            
             const id = document.getElementById('editTarget').value;
             const idx = projects.findIndex(p => p.id === id);
             if(idx > -1) {
@@ -393,24 +427,26 @@
                 projects[idx].desc = document.getElementById('editDesc').value;
                 saveToLocal();
                 renderVoteGrid();
-                syncToCloud(); // 全体へ送信
+                syncToCloud();
                 alert("更新＆同期しました");
             }
         }
 
         function updateTTData() {
+            if(isProcessing) return;
+            isProcessing = true;
+
             ttData.kodo = document.getElementById('editTTKodo').value;
             ttData.ground = document.getElementById('editTTGround').value;
             saveToLocal();
             renderTT();
-            syncToCloud(); // 全体へ送信
+            syncToCloud();
             alert("スケジュールを更新＆同期しました");
         }
 
         function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
         function toggleNav() { document.getElementById('navOverlay').classList.toggle('open'); }
 
-        // スクロール監視
         const obs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('visible')));
         window.onload = () => {
             updateTimer(); 
