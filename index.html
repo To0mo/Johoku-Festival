@@ -4,293 +4,388 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第85回 城北祭 - 男前 -</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&family=Shippori+Mincho:wght@900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Shippori+Mincho:wght@800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     
     <style>
         :root {
-            --bg-color: #0d0d0d;
-            --main-red: #e60012;
-            --text-white: #ffffff;
-            --menu-bg: rgba(0, 0, 0, 0.95);
-            --accent-gray: #333;
-            --card-bg: rgba(255, 255, 255, 0.05);
+            --bg-color: #050505;
+            --main-red: #E50914;
+            --red-glow: rgba(229, 9, 20, 0.5);
+            --text-primary: #F5F5F1;
+            --text-secondary: #8A8A8A;
+            --border-color: #282828;
+            --card-bg: #141414;
+            --radius-md: 10px;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        body, html { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-white); font-family: 'Noto Sans JP', sans-serif; overflow-x: hidden; scroll-behavior: smooth; }
+        *, *::before, *::after { box-sizing: border-box; }
 
-        /* オープニング */
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            background-color: transparent;
+            color: var(--text-primary);
+            font-family: 'Noto Sans JP', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .page-background {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            z-index: -1;
+            overflow: hidden;
+        }
+        #ember-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        
         #opening {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center;
-            animation: fadeOut 1s ease 2.5s forwards;
+            background: #000; z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            animation: fadeOutOpening 1s ease-in-out 3s forwards;
         }
-        .op-text {
-            font-family: 'Shippori Mincho', serif; font-size: clamp(3rem, 10vw, 6rem); font-weight: 900;
-            color: var(--main-red); letter-spacing: 1rem; opacity: 0;
-            animation: zoomIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+        .op-title {
+            font-family: 'Shippori Mincho', serif; font-size: clamp(6rem, 25vw, 15rem); font-weight: 800;
+            line-height: 1; letter-spacing: 0.1em;
+            display: flex;
         }
-        @keyframes zoomIn { 0% { opacity: 0; transform: scale(0.5) blur(10px); } 100% { opacity: 1; transform: scale(1) blur(0); } }
-        @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+        .op-title span {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(50px);
+            animation: revealChar 1s var(--ease-out) forwards;
+        }
+        .op-title span:nth-child(1) { animation-delay: 0.5s; }
+        .op-title span:nth-child(2) { animation-delay: 0.7s; }
 
-        .bg-pattern {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-            background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('https://www.transparenttextures.com/patterns/dark-matter.png');
-            background-attachment: fixed;
+        .op-subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            opacity: 0;
+            letter-spacing: 0.3em;
+            animation: fadeIn 1s ease 1.8s forwards;
+            margin-top: 2rem;
         }
+
+        @keyframes revealChar { to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { to { opacity: 1; } }
+        @keyframes fadeOutOpening { to { opacity: 0; visibility: hidden; } }
 
         header {
             position: fixed; top: 0; width: 100%; z-index: 1000;
             display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 30px; box-sizing: border-box; background: rgba(0,0,0,0.9); border-bottom: 2px solid var(--main-red);
+            padding: 1.25rem 2.5rem;
+            background: rgba(5, 5, 5, 0.6);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--border-color);
         }
-        .logo { font-family: 'Shippori Mincho', serif; font-size: 1.2rem; font-weight: 900; }
+        .logo { font-family: 'Shippori Mincho', serif; font-size: 1.5rem; font-weight: 800; }
+        .menu-btn {
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-primary);
+            padding: 0.6rem 1.2rem; border-radius: var(--radius-md); font-weight: 700; cursor: pointer; transition: 0.2s;
+        }
+        .menu-btn:hover { background: var(--text-primary); color: #000; }
+        .icon { width: 1.2em; height: 1.2em; fill: currentColor; vertical-align: middle; }
 
-        /* 右1/4 メニュー */
-        .menu-btn { background: var(--main-red); border: none; color: #fff; padding: 10px 20px; font-weight: 900; cursor: pointer; }
         .nav-overlay {
-            position: fixed; top: 0; right: -25%; width: 25%; height: 100%;
-            background: var(--menu-bg); backdrop-filter: blur(15px); z-index: 1001;
-            transition: 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; flex-direction: column; padding: 80px 30px; box-sizing: border-box;
+            position: fixed; top: 0; right: 0; width: 100%; max-width: 450px; height: 100%;
+            background: rgba(5, 5, 5, 0.85); backdrop-filter: blur(25px);
+            border-left: 1px solid var(--border-color); z-index: 1001;
+            transform: translateX(100%); transition: transform 0.6s var(--ease-out);
+            display: flex; flex-direction: column; padding: 5rem 3.5rem;
         }
-        @media (max-width: 768px) { .nav-overlay { width: 75%; right: -75%; } }
-        .nav-overlay.open { transform: translateX(-100%); }
-        .nav-overlay a { color: #fff; text-decoration: none; font-size: 1rem; font-weight: 900; margin: 10px 0; }
-
-        /* セクション */
-        section { max-width: 1100px; margin: 0 auto; padding: 100px 20px; opacity: 0; transform: translateY(30px); transition: 1s; }
+        .nav-overlay.open { transform: translateX(0); }
+        .nav-link, .nav-external-link {
+            color: var(--text-secondary); text-decoration: none; font-size: 2rem; font-weight: 800;
+            margin: 1rem 0; font-family: 'Shippori Mincho', serif; transition: color 0.3s, transform 0.3s;
+        }
+        .nav-link:hover, .nav-external-link:hover { color: var(--main-red); transform: translateX(10px); }
+        .nav-external-link { font-size: 1rem; font-family: 'Noto Sans JP'; display:flex; align-items:center; gap: 0.5rem; }
+        .nav-divider { border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0; }
+        
+        .main-content { position: relative; z-index: 1; }
+        section { max-width: 1100px; margin: 0 auto; padding: 8rem 1.5rem; opacity: 0; transform: translateY(30px); transition: opacity 1s, transform 1s; }
         section.visible { opacity: 1; transform: translateY(0); }
-        .section-title { font-size: 2.2rem; border-left: 8px solid var(--main-red); padding-left: 20px; margin-bottom: 40px; font-family: 'Shippori Mincho', serif; }
+        .section-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 3.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .section-title { font-size: 2.5rem; margin: 0; font-family: 'Shippori Mincho', serif; text-shadow: 0 0 10px var(--red-glow); }
+        .total-votes { font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); }
+        #total-votes-count { color: var(--text-primary); font-size: 1.5rem; font-weight: bold; margin-left: 0.5rem; }
 
-        .hero { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .main-title { font-family: 'Shippori Mincho', serif; font-size: clamp(4rem, 15vw, 9rem); margin: 0; text-shadow: 4px 4px 0 var(--main-red); }
-        .timer-box { font-family: 'JetBrains Mono', monospace; font-size: clamp(1rem, 4vw, 2.2rem); margin-top: 30px; font-weight: 900; }
-        .ms { color: var(--main-red); font-size: 0.7em; }
+        .hero { height: 100vh; padding: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .main-title { font-family: 'Shippori Mincho', serif; font-size: clamp(5rem, 20vw, 12rem); font-weight: 800; line-height: 1; margin: 0; letter-spacing: -0.05em; text-shadow: 0 0 30px var(--red-glow); }
+        .timer-box { font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; margin-top: 2rem; color: var(--text-secondary); }
 
-        /* 企画カード */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .card { background: var(--card-bg); border: 1px solid var(--accent-gray); padding: 20px; text-align: left; transition: 0.3s; }
-        .card.voted { border-color: var(--main-red); background: rgba(230, 0, 18, 0.15); }
-        .card-class { color: var(--main-red); font-weight: 900; font-size: 0.8rem; margin-bottom: 5px; }
-        .card-desc { font-size: 0.85rem; color: #ccc; margin: 10px 0; line-height: 1.6; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2rem; }
+        .card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            padding: 2rem; border-radius: var(--radius-md); 
+            transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out), border-color 0.3s;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
         
-        .btn-vote { width: 100%; padding: 10px; margin-top: 15px; font-weight: 900; border: none; cursor: pointer; transition: 0.2s; }
-        .btn-vote.active { background: var(--main-red); color: #fff; }
-        .btn-vote.active:hover { background: #ff1a2e; }
-        .btn-vote.active:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        .card:not(.voted):hover {
+            transform: translateY(-10px);
+            border-color: var(--text-secondary);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+        }
+        .card.voted { border-color: var(--main-red); }
         
-        .btn-vote.cancel { background: #444; color: #fff; }
-        .btn-vote.cancel:hover { background: #666; }
+        .card-class { font-family: 'JetBrains Mono', monospace; color: var(--main-red); font-weight: 500; margin-bottom: 0.75rem; }
+        .card-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 1rem; margin-top: 0; font-family: 'Shippori Mincho', serif; }
+        .card-desc { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.7; min-height: 3.4em; }
+        
+        .btn-vote {
+            width: 100%; padding: 1rem; margin-top: 1.5rem; font-weight: 700; border: none; cursor: pointer;
+            border-radius: var(--radius-md); font-size: 1rem; transition: 0.2s;
+            display: flex; justify-content: center; align-items: center; gap: 0.5rem;
+        }
+        .btn-vote.active { background: var(--main-red); color: #fff; box-shadow: 0 0 20px var(--red-glow); }
+        .btn-vote.active:hover { background: #ff453a; }
+        .btn-vote.cancel { background: #333; color: var(--text-primary); }
+        
+        /* 修正: disabledボタンのスタイルを統一 */
+        .btn-vote:disabled {
+            background: #222;
+            color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
 
-        /* タイムテーブル */
-        .tt-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 768px) { .tt-container { grid-template-columns: 1fr; } }
-        .tt-box { background: rgba(255,255,255,0.03); padding: 20px; border: 1px solid #222; }
-        .tt-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; font-size: 0.85rem; }
-        .tt-time { color: var(--main-red); font-weight: 900; }
+        .tt-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; }
+        .tt-header { color: var(--main-red); font-family: 'Shippori Mincho', serif; font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .tt-row { display: flex; padding: 1rem 0; border-bottom: 1px solid var(--border-color); }
+        .tt-time { font-family: 'JetBrains Mono', monospace; color: var(--text-secondary); min-width: 70px; }
+        .tt-event { font-weight: 700; }
 
-        /* 駅時刻表 */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
-        th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-        th { background: #222; color: var(--main-red); }
+        .map-frame { width: 100%; height: 400px; border: 1px solid var(--border-color); border-radius: var(--radius-md); filter: grayscale(1) invert(0.95); margin-bottom: 2rem; }
+        table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; }
+        th, td { border: 1px solid var(--border-color); padding: 1rem; text-align: center; }
+        th { background: var(--card-bg); font-weight: 700; }
 
-        /* マップ */
-        .map-frame { width: 100%; height: 400px; border: 1px solid var(--accent-gray); filter: grayscale(1) invert(0.9); }
-
-        /* 管理画面モーダル */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 2000; overflow-y: auto; padding: 20px; }
-        .modal-inner { max-width: 900px; margin: 0 auto; background: #111; padding: 30px; border: 2px solid var(--main-red); }
-        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; background: #000; color: #fff; border: 1px solid #333; box-sizing: border-box; }
-        .admin-section { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #222; }
-
-        /* 通信中ロック */
-        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; cursor: wait; background: rgba(0,0,0,0); }
-
-        footer { background: #000; padding: 60px; text-align: center; font-size: 0.7rem; opacity: 0.5; }
+        footer { background: #000; padding: 4rem 1rem; text-align: center; font-size: 0.8rem; color: #444; border-top: 1px solid var(--border-color); }
+        .stealth-admin { text-decoration: none; color: #0C0C0C; cursor: help; transition: color 0.2s; padding: 0.5rem; }
+        .stealth-admin:hover { color: #222; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; padding: 2rem; overflow-y: auto; }
+        .modal-inner { max-width: 800px; margin: 0 auto; background: #000; padding: 2.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+        .admin-section { margin-bottom: 2.5rem; }
+        .admin-section h3 { font-family: 'Shippori Mincho', serif; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .admin-input { width: 100%; padding: 0.8rem 1rem; margin-bottom: 1rem; background: #111; color: var(--text-primary); border: 1px solid #333; border-radius: var(--radius-md); }
+        
+        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; cursor: wait; }
     </style>
 </head>
 <body>
+    
+    <div class="page-background">
+        <canvas id="ember-canvas"></canvas>
+    </div>
 
-    <div id="opening"><div class="op-text">男 前</div></div>
-    <div class="bg-pattern"></div>
-    <!-- 通信中の操作ブロック用レイヤー -->
     <div id="loading-overlay"></div>
 
-    <header>
-        <div class="logo">第85回 城北祭</div>
-        <button class="menu-btn" onclick="toggleNav()">MENU</button>
-    </header>
+    <div id="opening">
+        <div class="op-title"><span>男</span><span>前</span></div>
+        <div class="op-subtitle">THE 85TH JOHOKU FESTIVAL</div>
+    </div>
+    
+    <div class="main-content">
+        <header>
+            <div class="logo">男前</div>
+            <button class="menu-btn" id="menu-btn">MENU</button>
+        </header>
 
-    <nav id="navOverlay" class="nav-overlay">
-        <a href="#top" onclick="toggleNav()">TOP</a>
-        <a href="#vote" onclick="toggleNav()">企画投票</a>
-        <a href="#timetable" onclick="toggleNav()">スケジュール</a>
-        <a href="#access" onclick="toggleNav()">アクセス</a>
-        <a href="#map" onclick="toggleNav()">構内図</a>
-        <hr style="width:100%; border-color:#222; margin:15px 0;">
-        <a href="https://www.johoku.ac.jp/" target="_blank">城北学園 HP</a>
-        <a href="https://www.youtube.com/@johoku_festival" target="_blank">実行委員会 YouTube</a>
-        <button onclick="toggleNav()" style="margin-top:auto; background:none; color:var(--main-red); border:1px solid var(--main-red); padding:10px; cursor:pointer;">CLOSE</button>
-    </nav>
+        <nav id="navOverlay" class="nav-overlay">
+            <a href="#top" class="nav-link">トップ</a>
+            <a href="#vote" class="nav-link">企画投票</a>
+            <a href="#timetable" class="nav-link">スケジュール</a>
+            <a href="#access" class="nav-link">アクセス</a>
+            <a href="#map" class="nav-link">構内図</a>
+            <hr class="nav-divider">
+            <a href="https://www.johoku.ac.jp/" target="_blank" rel="noopener noreferrer" class="nav-external-link">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                城北学園 HP
+            </a>
+            <a href="https://www.youtube.com/@johoku_festival" target="_blank" rel="noopener noreferrer" class="nav-external-link">
+                 <svg class="icon" viewBox="0 0 24 24"><path d="M10 16.5l6-4.5-6-4.5v9zM21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81z"/></svg>
+                実行委員会 YouTube
+            </a>
+        </nav>
 
-    <section id="top" class="hero visible">
-        <h1 class="main-title">男前</h1>
-        <div class="timer-box" id="fullTimer">00d 00:00:00<span class="ms">.000</span></div>
-    </section>
+        <section id="top" class="hero visible">
+            <h1 class="main-title">第85回<br>城北祭</h1>
+            <div class="timer-box" id="fullTimer">00d 00:00:00</div>
+        </section>
 
-    <section id="vote">
-        <h2 class="section-title">企画投票・紹介</h2>
-        <div id="cardGrid" class="grid"></div>
-    </section>
-
-    <section id="timetable">
-        <h2 class="section-title">タイムテーブル</h2>
-        <div class="tt-container">
-            <div class="tt-box">
-                <h3 style="color:var(--main-red); margin-top:0;">講堂ステージ</h3>
-                <div id="tt-kodo"></div>
+        <section id="vote">
+            <div class="section-header">
+                <h2 class="section-title">企画投票</h2>
+                <div id="total-votes-display" class="total-votes">TOTAL VOTES: <span id="total-votes-count">0</span></div>
             </div>
-            <div class="tt-box">
-                <h3 style="color:var(--main-red); margin-top:0;">グラウンド</h3>
-                <div id="tt-ground"></div>
+            <div id="cardGrid" class="grid"></div>
+        </section>
+
+        <section id="timetable">
+            <div class="section-header"><h2 class="section-title">タイムテーブル</h2></div>
+            <div class="tt-container">
+                <div><h3 class="tt-header">講堂ステージ</h3><div id="tt-kodo"></div></div>
+                <div><h3 class="tt-header">グラウンド</h3><div id="tt-ground"></div></div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="access">
-        <h2 class="section-title">アクセス・駅時刻表</h2>
-        <iframe class="map-frame" src="http://googleusercontent.com/maps.google.com/5"></iframe>
-        <table>
-            <tr><th>時</th><th>上板橋駅 池袋方面 (上り)</th><th>成増方面 (下り)</th></tr>
-            <tr><td>09-18</td><td>05 15 25 35 45 55 (各時目安)</td><td>00 10 20 30 40 50 (各時目安)</td></tr>
-        </table>
-    </section>
+        <section id="access">
+            <div class="section-header"><h2 class="section-title">アクセス</h2></div>
+            <iframe class="map-frame" src="http://googleusercontent.com/maps.google.com/5"></iframe>
+            <table>
+                <thead><tr><th>時</th><th>上板橋駅 池袋方面 (上り)</th><th>成増方面 (下り)</th></tr></thead>
+                <tbody><tr><td>09-18</td><td>05 15 25 35 45 55</td><td>00 10 20 30 40 50</td></tr></tbody>
+            </table>
+        </section>
 
-    <section id="map">
-        <h2 class="section-title">構内図</h2>
-        <div style="background:#111; padding:40px; border:1px solid #333; text-align:center;">
-            [ 1F:受付 2F:中学 3F:高校 4F:特別教室 ]
-        </div>
-    </section>
-
-    <div id="adminModal" class="modal">
-        <div class="modal-inner">
-            <h2 style="border-bottom: 2px solid var(--main-red);">作者専用：統制司令室</h2>
-            
-            <div class="admin-section">
-                <h3>1. リアルタイム投票結果</h3>
-                <div id="adminVoteChart" style="background:#000; padding:15px; border:1px solid #222; max-height:200px; overflow-y:scroll;"></div>
+        <section id="map">
+            <div class="section-header"><h2 class="section-title">構内図</h2></div>
+            <div style="background:var(--card-bg); padding:4rem; border-radius:var(--radius-md); text-align:center; font-family:'JetBrains Mono'; color:var(--text-secondary);">
+                FLOOR GUIDE [ 1F:受付 / 2F:中学 / 3F:高校 / 4F:LAB ]
             </div>
+        </section>
 
-            <div class="admin-section">
-                <h3>2. 企画内容の編集</h3>
-                <select id="editTarget" onchange="loadProjectToForm()"></select>
-                <input type="text" id="editTitle" placeholder="企画名">
-                <textarea id="editDesc" rows="4" placeholder="紹介文"></textarea>
-                <button class="btn-vote active" onclick="updateProjectData()">内容を全体へ同期</button>
+        <footer>
+            &copy; 2026 JOHOKU FESTIVAL COMMITTEE
+            <a href="#" class="stealth-admin" onclick="openAdmin(); return false;">[・]</a>
+        </footer>
+
+        <div id="adminModal" class="modal">
+            <div class="modal-inner">
+                <div class="admin-section">
+                    <h3>企画内容の編集</h3>
+                    <select id="editTarget" class="admin-input" onchange="loadProjectToForm()"></select>
+                    <input type="text" id="editTitle" class="admin-input" placeholder="企画名">
+                    <textarea id="editDesc" rows="4" class="admin-input" placeholder="紹介文"></textarea>
+                    <button class="btn-vote active" onclick="updateProjectData()">内容を全体へ同期</button>
+                </div>
+                <div class="admin-section">
+                    <h3>タイムテーブル編集</h3>
+                    <p style="color:var(--text-secondary); font-size:0.8rem;">形式: 09:00,企画名 (改行区切り)</p>
+                    <textarea id="editTTKodo" rows="4" class="admin-input" placeholder="講堂ステージ"></textarea>
+                    <textarea id="editTTGround" rows="4" class="admin-input" placeholder="グラウンド"></textarea>
+                    <button class="btn-vote active" onclick="updateTTData()">スケジュールを全体へ同期</button>
+                </div>
+                <button class="btn-vote cancel" onclick="closeAdmin()">閉じる</button>
             </div>
-
-            <div class="admin-section">
-                <h3>3. タイムテーブル編集</h3>
-                <p>形式: 09:00,企画名 (改行区切り)</p>
-                <textarea id="editTTKodo" rows="4"></textarea>
-                <textarea id="editTTGround" rows="4"></textarea>
-                <button class="btn-vote active" onclick="updateTTData()">スケジュールを全体へ同期</button>
-            </div>
-
-            <button class="btn-vote cancel" onclick="closeAdmin()">閉じる</button>
         </div>
     </div>
 
-    <footer>
-        <span style="cursor:pointer;" onclick="openAdmin()">作者専用</span><br><br>
-        © 2026 城北祭実行委員会
-    </footer>
-
     <script>
-        // --- 1. MQTT接続設定 ---
-        const MQTT_TOPIC = "johoku85_otokomae_sys_v2_SECRET"; // 必要に応じて変更してください
+        // --- 1. 演出: 燃える背景 ---
+        const canvas = document.getElementById('ember-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let animationFrameId;
+
+        function setupCanvas() {
+            if (!canvas) return;
+            const bgElement = document.querySelector('.page-background');
+            canvas.width = bgElement.offsetWidth;
+            canvas.height = bgElement.offsetHeight;
+            particles = [];
+            const particleCount = Math.floor(canvas.width * canvas.height / 12000);
+            for (let i = 0; i < particleCount; i++) {
+                const isRed = Math.random() > 0.4;
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height + canvas.height,
+                    radius: Math.random() * 2 + 0.8,
+                    speed: Math.random() * 0.6 + 0.3,
+                    opacity: Math.random() * 0.6 + 0.3,
+                    color: isRed ? 'rgba(229, 9, 20,' : 'rgba(255, 100, 0,',
+                    shadow: isRed ? 'red' : 'orange'
+                });
+            }
+        }
+
+        function drawParticles() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color + p.opacity + ')';
+                ctx.shadowColor = p.shadow;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                p.y -= p.speed;
+                if (p.y < -10) {
+                    p.y = canvas.height + 10;
+                    p.x = Math.random() * canvas.width;
+                }
+            });
+            animationFrameId = requestAnimationFrame(drawParticles);
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            setupCanvas();
+            drawParticles();
+        });
+        resizeObserver.observe(document.querySelector('.page-background'));
+
+        // --- 2. MQTT設定 ---
+        const MQTT_TOPIC = "johoku85_otokomae_sys_v10_FINAL";
         const MQTT_BROKER = "wss://public:public@public.cloud.shiftr.io";
-        
-        // 自分を識別するID（ループ防止用）
         const MY_CLIENT_ID = 'user_' + Math.random().toString(36).substring(2, 10);
         const client = mqtt.connect(MQTT_BROKER, { clientId: MY_CLIENT_ID });
-        
-        // 連打防止用ロック
         let isProcessing = false;
 
-        // --- 2. データ初期設定 ---
-        const initialProjects = [];
+        // --- 3. データ定義 ---
         const m_titles = ["歴史探訪", "物理実験", "数学パズル", "生物観察", "化学マジック", "地理クイズ", "文学の旅"];
         const h_titles = ["漢の焼きそば", "VR城北", "カジノロワイヤル", "脱出迷宮", "e-Sports頂上決戦", "鉄研ジオラマ", "縁日屋台", "映像クリエイター", "お化け屋敷"];
-
         const generateInitialData = () => {
             const arr = [];
-            for(let i=1; i<=3; i++) {
-                ['A','B','C','D','E','F','G'].forEach((c, idx) => {
-                    arr.push({ id: `M${i}${c}`, class: `中${i}-${c}`, title: m_titles[idx], desc: `${i}年${c}組です。僕たちが半年かけて準備した最高の展示を見に来てください！` });
-                });
-            }
-            for(let i=1; i<=3; i++) {
-                ['A','B','C','D','E','F','G','H','I'].forEach((c, idx) => {
-                    arr.push({ id: `H${i}${c}`, class: `高${i}-${c}`, title: h_titles[idx] || "漢の企画", desc: `高校生のプライドをかけた最強の企画です。 ${c}組一同、最高のおもてなしを約束します。` });
-                });
-            }
+            for(let i=1; i<=3; i++) ['A','B','C','D','E','F','G'].forEach((c,idx)=>arr.push({id:`M${i}${c}`,class:`中${i}-${c}`,title:m_titles[idx],desc:`${i}年${c}組が半年の歳月をかけて創り上げた渾身の展示です。`}));
+            for(let i=1; i<=3; i++) ['A','B','C','D','E','F','G','H','I'].forEach((c,idx)=>arr.push({id:`H${i}${c}`,class:`高${i}-${c}`,title:h_titles[idx]||"漢の企画",desc:`高校生のプライドと情熱をかけた最強の企画。${c}組一同、最高のおもてなしを約束します。`}));
             return arr;
         };
-
+        
         let projects = JSON.parse(localStorage.getItem('j85_projects')) || generateInitialData();
         let allVotes = JSON.parse(localStorage.getItem('j85_votes_all')) || {};
-        let ttData = JSON.parse(localStorage.getItem('j85_tt')) || {
-            kodo: "09:30,オープニング\n13:00,ミスター城北\n15:00,吹奏楽部演奏",
-            ground: "10:00,招待試合\n12:00,部活対抗リレー\n15:30,後夜祭予行"
-        };
+        let ttData = JSON.parse(localStorage.getItem('j85_tt')) || { kodo: "09:30,オープニング\n13:00,ミスター城北", ground: "10:00,招待試合\n12:00,部活対抗リレー" };
         let myVoteId = localStorage.getItem('j85_my_vote') || null;
 
-        // --- 3. MQTTイベント処理 ---
-        client.on('connect', () => {
-            console.log("Connected");
-            client.subscribe(MQTT_TOPIC);
-        });
-
+        // --- 4. MQTTイベント & データ同期 ---
+        client.on('connect', () => client.subscribe(MQTT_TOPIC));
         client.on('message', (topic, message) => {
             if (topic === MQTT_TOPIC) {
                 try {
-                    const remoteData = JSON.parse(message.toString());
-                    
-                    // 自分が送信したデータが返ってきた場合は無視（ループ防止）
-                    if (remoteData.sender === MY_CLIENT_ID) return;
-
-                    // データを更新
-                    if(remoteData.projects) projects = remoteData.projects;
-                    if(remoteData.votes) allVotes = remoteData.votes;
-                    if(remoteData.tt) ttData = remoteData.tt;
-                    
+                    const data = JSON.parse(message.toString());
+                    if (data.sender === MY_CLIENT_ID) return;
+                    if(data.projects) projects = data.projects;
+                    if(data.votes) allVotes = data.votes;
+                    if(data.tt) ttData = data.tt;
                     saveToLocal();
-                    renderVoteGrid();
-                    renderTT();
-                    if(document.getElementById('adminModal').style.display === 'block') refreshAdminView();
-                } catch(e) { console.error("Data Error", e); }
+                    renderAll();
+                } catch(e) { console.error("MQTT Message Error:", e); }
             }
         });
 
-        // データを送信（ロック機能付き）
         function syncToCloud() {
-            const payload = {
-                sender: MY_CLIENT_ID, // 送信者IDを付与
-                projects: projects,
-                votes: allVotes,
-                tt: ttData
-            };
-            // 重要な更新なので retain: true
+            const payload = { sender: MY_CLIENT_ID, projects, votes: allVotes, tt: ttData };
             client.publish(MQTT_TOPIC, JSON.stringify(payload), { qos: 1, retain: true });
-            
-            // 操作ロック解除タイマー
             setTimeout(() => {
                 isProcessing = false;
                 document.getElementById('loading-overlay').style.display = 'none';
-                renderVoteGrid(); // ボタン状態を戻すために再描画
-            }, 2000); // 2秒間は操作不能にする
+                renderVoteGrid();
+            }, 1000);
         }
 
         function saveToLocal() {
@@ -299,161 +394,136 @@
             localStorage.setItem('j85_tt', JSON.stringify(ttData));
         }
 
-        // --- 4. タイマー ---
-        function updateTimer() {
-            const diff = new Date('2026-09-16T09:00:00') - new Date();
-            if (diff <= 0) { document.getElementById('fullTimer').innerText = "祭 典 開 始"; return; }
-            const d = Math.floor(diff / 86400000);
-            const h = Math.floor((diff % 86400000) / 3600000);
-            const m = Math.floor((diff % 3600000) / 60000);
-            const s = Math.floor((diff % 60000) / 1000);
-            const ms = Math.floor(diff % 1000);
-            document.getElementById('fullTimer').innerHTML = `${d}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}<span class="ms">.${String(ms).padStart(3,'0')}</span>`;
-            requestAnimationFrame(updateTimer);
+        // --- 5. 描画関数 ---
+        function renderAll() {
+            renderVoteGrid();
+            renderTotalVotes();
+            renderTT();
+        }
+        
+        function renderTotalVotes() {
+            const totalCount = Object.values(allVotes).reduce((sum, count) => sum + count, 0);
+            document.getElementById('total-votes-count').textContent = totalCount;
         }
 
-        // --- 5. 描画系 ---
         function renderVoteGrid() {
             const grid = document.getElementById('cardGrid');
+            if(!grid) return;
             grid.innerHTML = projects.map(p => {
                 const isMyVote = myVoteId === p.id;
-                // 一般ユーザーには票数を見せない
-                
-                // ボタンの文言
-                let btnHtml = '';
+                let btnHtml;
                 if (isProcessing) {
-                    btnHtml = `<button class="btn-vote active" disabled>処理中...</button>`;
+                    btnHtml = `<button class="btn-vote" disabled>処理中...</button>`;
                 } else if (isMyVote) {
                     btnHtml = `<button class="btn-vote cancel" onclick="cancelVote()">投票を取り消す</button>`;
                 } else {
-                    btnHtml = `<button class="btn-vote active" onclick="castVote('${p.id}')" ${myVoteId ? 'disabled' : ''}>${myVoteId ? '他へ投票済み' : 'この企画に投票'}</button>`;
+                    btnHtml = `<button class="btn-vote active" onclick="castVote('${p.id}')" ${myVoteId ? 'disabled' : ''}>${myVoteId ? '投票済み' : 'この企画に投票'}</button>`;
                 }
-
-                return `
-                    <div class="card ${isMyVote ? 'voted' : ''}">
-                        <div class="card-class">${p.class}</div>
-                        <div style="font-weight:900; font-size:1.1rem;">${p.title}</div>
-                        <div class="card-desc">${p.desc}</div>
-                        ${btnHtml}
-                    </div>
-                `;
+                return `<div class="card ${isMyVote ? 'voted' : ''}"><div class="card-class">${p.class}</div><h3 class="card-title">${p.title}</h3><p class="card-desc">${p.desc}</p>${btnHtml}</div>`;
             }).join('');
         }
 
         function renderTT() {
-            const buildRows = (str) => str.split('\n').map(l => {
-                const [t, a] = l.split(','); return `<div class="tt-row"><span class="tt-time">${t}</span><span>${a || ''}</span></div>`;
+            const buildRows = (str) => (str || '').split('\n').map(line => {
+                const [time, event] = line.split(',');
+                return `<div class="tt-row"><div class="tt-time">${time || ''}</div><div class="tt-event">${event || ''}</div></div>`;
             }).join('');
             document.getElementById('tt-kodo').innerHTML = buildRows(ttData.kodo);
             document.getElementById('tt-ground').innerHTML = buildRows(ttData.ground);
         }
-
-        // --- 6. 投票処理 (連打対策強化版) ---
+        
+        // --- 6. 投票ロジック ---
         function castVote(id) {
-            if (isProcessing) return; // 処理中なら何もしない
-            isProcessing = true;
-            document.getElementById('loading-overlay').style.display = 'block'; // 全画面ガード
-            renderVoteGrid(); // ボタンを「処理中」に変える
-
+            if (isProcessing) return; isProcessing = true;
+            document.getElementById('loading-overlay').style.display = 'block';
             myVoteId = id;
             allVotes[id] = (allVotes[id] || 0) + 1;
-            
             localStorage.setItem('j85_my_vote', myVoteId);
-            saveToLocal();
-            syncToCloud();
+            saveToLocal(); renderAll(); syncToCloud();
         }
 
         function cancelVote() {
-            if (isProcessing) return;
-            if (!myVoteId) return;
-            
-            isProcessing = true;
+            if (isProcessing || !myVoteId) return; isProcessing = true;
             document.getElementById('loading-overlay').style.display = 'block';
-            renderVoteGrid();
-
             allVotes[myVoteId] = Math.max(0, (allVotes[myVoteId] || 1) - 1);
             myVoteId = null;
-            
             localStorage.setItem('j85_my_vote', "");
-            saveToLocal();
-            syncToCloud();
+            saveToLocal(); renderAll(); syncToCloud();
         }
 
         // --- 7. 管理者機能 ---
         function openAdmin() {
-            if (prompt("パスワードを入力してください") === "0000") {
+            if (prompt("PASS?") === "0000") {
                 document.getElementById('adminModal').style.display = 'block';
-                refreshAdminView();
+                const sel = document.getElementById('editTarget');
+                sel.innerHTML = projects.map(p => `<option value="${p.id}">${p.class} ${p.title}</option>`).join('');
+                document.getElementById('editTTKodo').value = ttData.kodo;
+                document.getElementById('editTTGround').value = ttData.ground;
+                loadProjectToForm();
+            }
+        }
+        function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
+        function loadProjectToForm() {
+            const p = projects.find(x => x.id === document.getElementById('editTarget').value);
+            if(p){ document.getElementById('editTitle').value=p.title; document.getElementById('editDesc').value=p.desc; }
+        }
+        function updateProjectData() {
+            const p = projects.find(x => x.id === document.getElementById('editTarget').value);
+            if(p){
+                p.title = document.getElementById('editTitle').value; p.desc = document.getElementById('editDesc').value;
+                saveToLocal(); renderAll(); syncToCloud(); alert("企画情報を同期しました");
+            }
+        }
+        function updateTTData() {
+            ttData.kodo = document.getElementById('editTTKodo').value; ttData.ground = document.getElementById('editTTGround').value;
+            saveToLocal(); renderAll(); syncToCloud(); alert("タイムテーブルを同期しました");
+        }
+
+        // --- 8. ナビゲーションとその他 ---
+        const navOverlay = document.getElementById('navOverlay');
+        const menuBtn = document.getElementById('menu-btn');
+        
+        const closeNavOnOutsideClick = (event) => {
+            if (navOverlay.classList.contains('open') && !navOverlay.contains(event.target) && !menuBtn.contains(event.target)) {
+                toggleNav();
+            }
+        };
+
+        function toggleNav() {
+            const isOpen = navOverlay.classList.toggle('open');
+            if (isOpen) {
+                document.addEventListener('click', closeNavOnOutsideClick, true);
+            } else {
+                document.removeEventListener('click', closeNavOnOutsideClick, true);
             }
         }
         
-        function refreshAdminView() {
-            // ここでのみ票数を表示
-            document.getElementById('adminVoteChart').innerHTML = Object.entries(allVotes)
-                .sort((a,b) => b[1] - a[1])
-                .map(([id, count]) => {
-                    const p = projects.find(x => x.id === id);
-                    return `<div style="padding:5px; border-bottom:1px solid #333; display:flex; justify-content:space-between;">
-                        <span>${p ? p.class : id} ${p ? p.title : ''}</span>
-                        <strong style="color:var(--main-red);">${count}票</strong>
-                    </div>`;
-                }).join('');
-                
-            const sel = document.getElementById('editTarget');
-            if(sel.options.length !== projects.length) {
-                sel.innerHTML = projects.map(p => `<option value="${p.id}">${p.class} ${p.title}</option>`).join('');
-                loadProjectToForm();
-            }
-            document.getElementById('editTTKodo').value = ttData.kodo;
-            document.getElementById('editTTGround').value = ttData.ground;
+        // メニューボタンとメニュー内リンクのクリックイベント
+        menuBtn.addEventListener('click', toggleNav);
+        navOverlay.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', toggleNav);
+        });
+        
+        function updateTimer() {
+            const diff = new Date('2026-09-16T09:00:00') - new Date();
+            const el = document.getElementById('fullTimer');
+            if(!el) return;
+            if(diff <= 0) { el.innerText = "FESTIVAL STARTED"; return; }
+            const d=Math.floor(diff/864e5),h=String(Math.floor(diff%864e5/36e5)).padStart(2,'0'),m=String(Math.floor(diff%36e5/6e4)).padStart(2,'0'),s=String(Math.floor(diff%6e4/1e3)).padStart(2,'0');
+            el.innerText = `${d}d ${h}:${m}:${s}`;
+            requestAnimationFrame(updateTimer);
         }
+        
+        const obs = new IntersectionObserver(entries => entries.forEach(entry => {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        }), { threshold: 0.1 });
 
-        function loadProjectToForm() {
-            const p = projects.find(x => x.id === document.getElementById('editTarget').value);
-            if(p) {
-                document.getElementById('editTitle').value = p.title;
-                document.getElementById('editDesc').value = p.desc;
-            }
-        }
-
-        function updateProjectData() {
-            if(isProcessing) return;
-            isProcessing = true;
-            
-            const id = document.getElementById('editTarget').value;
-            const idx = projects.findIndex(p => p.id === id);
-            if(idx > -1) {
-                projects[idx].title = document.getElementById('editTitle').value;
-                projects[idx].desc = document.getElementById('editDesc').value;
-                saveToLocal();
-                renderVoteGrid();
-                syncToCloud();
-                alert("更新＆同期しました");
-            }
-        }
-
-        function updateTTData() {
-            if(isProcessing) return;
-            isProcessing = true;
-
-            ttData.kodo = document.getElementById('editTTKodo').value;
-            ttData.ground = document.getElementById('editTTGround').value;
-            saveToLocal();
-            renderTT();
-            syncToCloud();
-            alert("スケジュールを更新＆同期しました");
-        }
-
-        function closeAdmin() { document.getElementById('adminModal').style.display = 'none'; }
-        function toggleNav() { document.getElementById('navOverlay').classList.toggle('open'); }
-
-        const obs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('visible')));
-        window.onload = () => {
-            updateTimer(); 
-            renderVoteGrid(); 
-            renderTT();
+        // --- 9. 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTimer();
+            renderAll();
             document.querySelectorAll('section').forEach(s => obs.observe(s));
-        };
+        });
     </script>
 </body>
 </html>
